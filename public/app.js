@@ -37,6 +37,7 @@ const blockedTracksKey = "aura-blocked-tracks-by-book-id";
 const moodHistoryKey = "aura-moods-by-book-id";
 const sessionCacheName = "aura-session-v1";
 const sessionCachePath = "/offline/session.json";
+const defaultCoverLogoPath = "/logo/Screenshot_20260308_230255_Photos.jpg";
 
 const updateStatus = (text) => {
   ui.status.textContent = text;
@@ -66,12 +67,14 @@ const getInitials = (title) => {
   return initials || "AR";
 };
 
-const fallbackCoverUrl = (title) => {
+const initialsFallbackCoverUrl = (title) => {
   const initials = getInitials(title);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300"><rect width="100%" height="100%" fill="#2f7d57" /><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="64" font-weight="700">${initials}</text></svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 };
+
+const fallbackCoverUrl = () => defaultCoverLogoPath;
 
 const withCoverFallback = (url, title) => (url ? url : fallbackCoverUrl(title));
 
@@ -81,7 +84,14 @@ const applyImageFallback = (img, title) => {
   }
 
   const fallback = fallbackCoverUrl(title);
+  const initialsFallback = initialsFallbackCoverUrl(title);
   img.onerror = () => {
+    if (img.src.includes(defaultCoverLogoPath)) {
+      img.onerror = null;
+      img.src = initialsFallback;
+      return;
+    }
+
     img.onerror = null;
     img.src = fallback;
   };
