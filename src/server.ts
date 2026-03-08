@@ -342,16 +342,23 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
       const response = await fetch(pixabayUrl, {
     method: 'GET',
     headers: {
-        // Essential: Standard browser identity
+        // Essential: This "Human" header is the most common fix for 403s on Render
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        // Critical: Tells the server what format you expect
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        // Optional: Can help bypass some referrer checks
-        'Origin': 'https://pixabay.com',
+        'Accept': 'application/json',
         'Referer': 'https://pixabay.com/'
     }
 });
+
+// CRITICAL: Check if the response is actually OK before calling .json()
+if (!response.ok) {
+    const errorBody = await response.text().catch(() => "No body");
+    console.error(`Pixabay blocked the request. Status: ${response.status}, Body: ${errorBody}`);
+    // Return an empty array or throw a clean error so the app doesn't crash
+    return []; 
+}
+
+const data = await response.json();
+
 
 
 
