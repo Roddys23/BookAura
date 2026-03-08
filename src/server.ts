@@ -10,6 +10,9 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+
 const publicDir = path.resolve(process.cwd(), "public");
 
 app.use(cors());
@@ -376,8 +379,9 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
       ...new Set(tags.flatMap((tag) => getFoldersForTag(tag)).concat(["general"]))
     ];
 
-    const candidateTracks = allTracks.filter((track) => folderCandidates.includes(track.folder));
-    const selectedTracks = shuffle(candidateTracks).slice(0, 10);
+    const selectedTracks = shuffle(
+      allTracks.filter((track) => folderCandidates.includes(track.folder))
+    ).slice(0, 10);
 
     const tracks = selectedTracks.map((track) => ({
       id: track.id,
