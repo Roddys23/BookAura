@@ -9,6 +9,9 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+
 const publicDir = path.resolve(process.cwd(), "public");
 
 app.use(cors());
