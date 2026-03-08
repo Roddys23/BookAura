@@ -342,17 +342,17 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
       const response = await fetch(pixabayUrl, {
     method: 'GET',
     headers: {
-        // This 'User-Agent' makes Render look like a real browser to Pixabay
+        // Essential: Standard browser identity
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
+        // Critical: Tells the server what format you expect
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        // Optional: Can help bypass some referrer checks
+        'Origin': 'https://pixabay.com',
+        'Referer': 'https://pixabay.com/'
     }
 });
 
-if (!response.ok) {
-    // This will help us see if it's still 403 or something else
-    const errorBody = await response.text().catch(() => "No body");
-    throw new Error(`Pixabay failed (${response.status}): ${errorBody}`);
-}
 
 
       const payload = (await response.json()) as { hits?: PixabayTrack[] };
