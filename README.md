@@ -7,7 +7,7 @@ Mobile-first Progressive Web App that converts a book mood into a playable instr
 - Node.js + Express + TypeScript backend
 - Tailwind CSS mobile-first frontend
 - AI with `groq-sdk` (`llama-3.3-70b-versatile`)
-- Google Books API + Jamendo API integration
+- Google Books API + Pixabay Audio API integration
 - Web Audio API mixer (Rain, Wind, Fire)
 - PWA with Workbox service worker caching
 
@@ -16,7 +16,7 @@ Mobile-first Progressive Web App that converts a book mood into a playable instr
 Copy `.env.example` to `.env` and set:
 
 - `GROQ_API_KEY`
-- `JAMENDO_CLIENT_ID`
+- `PIXABAY_API_KEY`
 - `GOOGLE_BOOKS_API_KEY`
 - `PORT` (optional)
 

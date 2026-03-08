@@ -23,23 +23,25 @@ type BookResult = {
   cover: string;
 };
 
-type JamendoTrack = {
-  id: string;
-  name: string;
-  artist_name: string;
-  audio: string;
-  audiodownload: string;
-  audiodownload_allowed: boolean;
-  image: string;
-  duration: number;
-  instrumental?: number | string | boolean;
-  musicinfo?: {
-    vocalinstrumental?: string;
-  };
+type PixabayAudioVariant =
+  | string
+  | {
+      url?: string;
+    };
+
+type PixabayTrack = {
+  id: number | string;
+  tags?: string;
+  duration?: number;
+  downloads?: number;
+  pageURL?: string;
+  user?: string;
+  userImageURL?: string;
+  audio?: Record<string, PixabayAudioVariant | undefined>;
 };
 
 const groqApiKey = process.env.GROQ_API_KEY;
-const jamendoClientId = process.env.JAMENDO_CLIENT_ID;
+const pixabayApiKey = process.env.PIXABAY_API_KEY;
 const googleBooksApiKey = process.env.GOOGLE_BOOKS_API_KEY;
 
 const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
@@ -62,6 +64,47 @@ const cleanMediaUrl = (url?: string): string => {
 
 const trimDescription = (description: string): string =>
   description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const toTitleCase = (value: string): string =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+
+const getPixabayAudioUrl = (track: PixabayTrack): string => {
+  const audio = track.audio;
+  if (!audio) {
+    return "";
+  }
+
+  const variants = [audio.high, audio.medium, audio.low];
+  for (const variant of variants) {
+    if (typeof variant === "string") {
+      return cleanMediaUrl(variant);
+    }
+
+    if (variant?.url) {
+      return cleanMediaUrl(variant.url);
+    }
+  }
+
+  return "";
+};
+
+const buildTrackTitle = (track: PixabayTrack): string => {
+  const tags = String(track.tags || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (!tags.length) {
+    return `Instrumental Track ${track.id}`;
+  }
+
+  return toTitleCase(tags.join(" "));
+};
 
 const deriveFallbackMoodTags = (description: string): string[] => {
   const text = description.toLowerCase();
@@ -269,68 +312,79 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
     return;
   }
 
-  if (!jamendoClientId) {
-      res.status(503).json({ error: "Music provider is not configured. Set JAMENDO_CLIENT_ID to enable soundtrack playback." });
+  if (!pixabayApiKey) {
+    res.status(503).json({ error: "Music provider is not configured. Set PIXABAY_API_KEY to enable soundtrack playback." });
     return;
   }
 
   try {
-    const query = new URLSearchParams({
-      client_id: jamendoClientId,
-      format: "json",
-      limit: "25",
-      order: "popularity_total",
-      fuzzytags: tags.join(","),
-      include: "musicinfo",
-      audioformat: "mp32",
-      instrumental: "1"
-    });
+    const queryCandidates = [
+      `${tags.join(" ")} instrumental`,
+      ...tags.map((tag) => `${tag} instrumental music`),
+      `${tags[0]} cinematic instrumental`
+    ];
 
-    const jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?${query.toString()}`;
-    const response = await fetch(jamendoUrl);
+    const uniqueCandidates = [...new Set(queryCandidates.map((query) => query.trim()).filter(Boolean))].slice(0, 5);
 
-    if (!response.ok) {
-      throw new Error(`Jamendo failed (${response.status})`);
+    const allHits: PixabayTrack[] = [];
+
+    for (const queryText of uniqueCandidates) {
+      const query = new URLSearchParams({
+        key: pixabayApiKey,
+        q: queryText,
+        per_page: "30",
+        order: "popular",
+        category: "music",
+        safesearch: "true"
+      });
+
+      const pixabayUrl = `https://pixabay.com/api/audio/?${query.toString()}`;
+      const response = await fetch(pixabayUrl);
+
+      if (!response.ok) {
+        throw new Error(`Pixabay failed (${response.status})`);
+      }
+
+      const payload = (await response.json()) as { hits?: PixabayTrack[] };
+      allHits.push(...(payload.hits || []));
+
+      if (allHits.length >= 40) {
+        break;
+      }
     }
-
-    const payload = (await response.json()) as { results?: JamendoTrack[] };
 
     const disallowedVocalHints = /\b(voice|vocals?|lyric|singer|singing|feat\.?|featuring|ft\.?|duet|choir)\b/i;
 
-    const tracks = (payload.results || [])
+    const dedupedHits = Array.from(new Map(allHits.map((track) => [String(track.id), track])).values());
+
+    const tracks = dedupedHits
       .filter((track) => {
-        const hasInstrumentalFlag =
-          track.instrumental === true ||
-          track.instrumental === 1 ||
-          String(track.instrumental) === "1" ||
-          track.musicinfo?.vocalinstrumental === "instrumental";
-
-        const isExplicitlyInstrumental = track.musicinfo?.vocalinstrumental === "instrumental";
-        const noVocalHintsInName = !disallowedVocalHints.test(track.name || "");
-
-        return hasInstrumentalFlag && isExplicitlyInstrumental && noVocalHintsInName;
+        const metadataText = `${track.tags || ""} ${track.pageURL || ""}`.toLowerCase();
+        return !disallowedVocalHints.test(metadataText);
       })
-      .filter((track) => track.audiodownload_allowed === true)
+      .map((track) => ({ track, audioUrl: getPixabayAudioUrl(track) }))
+      .filter(({ audioUrl }) => Boolean(audioUrl))
+      .sort((a, b) => Number(b.track.downloads || 0) - Number(a.track.downloads || 0))
       .slice(0, 10)
-      .map((track) => ({
-        id: track.id,
-        title: track.name,
-        artist: track.artist_name,
-        audio: cleanMediaUrl(track.audio),
-        download: cleanMediaUrl(track.audiodownload),
-        image: cleanCoverUrl(track.image),
-        duration: track.duration
+      .map(({ track, audioUrl }) => ({
+        id: String(track.id),
+        title: buildTrackTitle(track),
+        artist: track.user || "Pixabay Artist",
+        audio: audioUrl,
+        download: audioUrl,
+        image: cleanCoverUrl(track.userImageURL),
+        duration: Number(track.duration || 0)
       }));
 
     if (!tracks.length) {
-        res.status(404).json({ error: "No strictly instrumental (lyric-free) tracks found for this mood. Try another book." });
+      res.status(404).json({ error: "No strictly instrumental (lyric-free) tracks found for this mood. Try another book." });
       return;
     }
 
-    res.json({ tracks, source: "jamendo" });
+    res.json({ tracks, source: "pixabay" });
   } catch (error) {
     console.error("/api/tracks error", error);
-      res.status(500).json({ error: "Failed to fetch music tracks." });
+    res.status(500).json({ error: "Failed to fetch music tracks." });
   }
 });
 

@@ -1,7 +1,7 @@
 /* global workbox */
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js");
 
-const APP_VERSION = "1772975985479";
+const APP_VERSION = "1772979026995";
 const CACHE_PREFIXES = ["aura-pages-", "aura-audio-", "aura-images-", "aura-api-", "aura-flight-mode-"];
 const ACTIVE_CACHES = new Set([
   `aura-pages-${APP_VERSION}`,
@@ -34,7 +34,8 @@ if (workbox) {
   workbox.routing.registerRoute(
     ({ request, url }) =>
       request.destination === "audio" ||
-      url.origin.includes("jamendo.com") ||
+      url.origin.includes("pixabay.com") ||
+      url.origin.includes("cdn.pixabay.com") ||
       url.pathname.startsWith("/audio/"),
     new workbox.strategies.CacheFirst({
       cacheName: `aura-audio-${APP_VERSION}`,
