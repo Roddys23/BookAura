@@ -52,8 +52,55 @@ const cleanCoverUrl = (url?: string): string => {
   return url.replace("http://", "https://").replace(/&zoom=\d+/i, "");
 };
 
+const cleanMediaUrl = (url?: string): string => {
+  if (!url) {
+    return "";
+  }
+
+  return url.replace(/^http:\/\//i, "https://");
+};
+
 const trimDescription = (description: string): string =>
   description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const deriveFallbackMoodTags = (description: string): string[] => {
+  const text = description.toLowerCase();
+
+  const keywordBuckets: Array<{ words: string[]; tag: string }> = [
+    { words: ["battle", "war", "fight", "hero", "epic", "quest"], tag: "epic" },
+    { words: ["mystery", "detective", "crime", "secret", "thriller"], tag: "mysterious" },
+    { words: ["love", "romance", "heart", "relationship"], tag: "romantic" },
+    { words: ["dark", "horror", "fear", "ghost", "haunted"], tag: "dark" },
+    { words: ["future", "space", "cyber", "robot", "sci-fi"], tag: "cinematic" },
+    { words: ["sad", "loss", "grief", "melancholy", "lonely"], tag: "emotional" },
+    { words: ["calm", "peace", "nature", "forest", "sea"], tag: "ambient" },
+    { words: ["rain", "night", "city", "noir"], tag: "atmospheric" }
+  ];
+
+  const tags: string[] = [];
+  for (const bucket of keywordBuckets) {
+    if (bucket.words.some((word) => text.includes(word))) {
+      tags.push(bucket.tag);
+    }
+
+    if (tags.length === 3) {
+      break;
+    }
+  }
+
+  while (tags.length < 3) {
+    const defaults = ["cinematic", "ambient", "emotional"];
+    const next = defaults.find((tag) => !tags.includes(tag));
+    if (!next) {
+      break;
+    }
+
+    tags.push(next);
+  }
+
+  return tags.slice(0, 3);
+};
+
 
 const getOpenLibraryCoverFromIsbn = (identifiers?: Array<{ type?: string; identifier?: string }>): string => {
   if (!Array.isArray(identifiers)) {
@@ -161,7 +208,7 @@ app.post("/api/moods", async (req: Request, res: Response) => {
   }
 
   if (!groq) {
-    res.status(500).json({ error: "GROQ_API_KEY is not configured." });
+    res.json({ tags: deriveFallbackMoodTags(description), source: "fallback" });
     return;
   }
 
@@ -198,23 +245,18 @@ app.post("/api/moods", async (req: Request, res: Response) => {
     }
 
     if (tags.length < 3) {
-      tags = [...tags, "cinematic", "ambient", "emotional"].slice(0, 3);
+      tags = deriveFallbackMoodTags(`${description} ${tags.join(" ")}`);
     }
 
-    res.json({ tags });
+    res.json({ tags, source: "groq" });
   } catch (error) {
     console.error("/api/moods error", error);
-    res.status(500).json({ error: "Failed to generate mood tags." });
+    res.json({ tags: deriveFallbackMoodTags(description), source: "fallback" });
   }
 });
 
 app.get("/api/tracks", async (req: Request, res: Response) => {
   const tagsRaw = String(req.query.tags || "").trim();
-
-  if (!jamendoClientId) {
-    res.status(500).json({ error: "JAMENDO_CLIENT_ID is not configured." });
-    return;
-  }
 
   const tags = tagsRaw
     .split(",")
@@ -224,6 +266,11 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
 
   if (!tags.length) {
     res.status(400).json({ error: "Missing query parameter 'tags'." });
+    return;
+  }
+
+  if (!jamendoClientId) {
+      res.status(503).json({ error: "Music provider is not configured. Set JAMENDO_CLIENT_ID to enable soundtrack playback." });
     return;
   }
 
@@ -269,21 +316,21 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
         id: track.id,
         title: track.name,
         artist: track.artist_name,
-        audio: track.audio,
-        download: track.audiodownload,
+        audio: cleanMediaUrl(track.audio),
+        download: cleanMediaUrl(track.audiodownload),
         image: cleanCoverUrl(track.image),
         duration: track.duration
       }));
 
     if (!tracks.length) {
-      res.status(404).json({ error: "No strictly instrumental (lyric-free) tracks found for this mood. Try another book." });
+        res.status(404).json({ error: "No strictly instrumental (lyric-free) tracks found for this mood. Try another book." });
       return;
     }
 
-    res.json({ tracks });
+    res.json({ tracks, source: "jamendo" });
   } catch (error) {
     console.error("/api/tracks error", error);
-    res.status(500).json({ error: "Failed to fetch music tracks." });
+      res.status(500).json({ error: "Failed to fetch music tracks." });
   }
 });
 

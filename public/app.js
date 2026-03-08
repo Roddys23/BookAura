@@ -30,8 +30,6 @@ const ui = {
 };
 
 let audioCtx;
-let musicSource;
-let musicGain;
 const ambientNodes = {};
 
 const cachedSessionKey = "aura-reader-session";
@@ -175,11 +173,11 @@ const ensureAudioGraph = () => {
     return;
   }
 
+  if (!(window.AudioContext || window.webkitAudioContext)) {
+    return;
+  }
+
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  musicSource = audioCtx.createMediaElementSource(ui.player);
-  musicGain = audioCtx.createGain();
-  musicGain.gain.value = 1;
-  musicSource.connect(musicGain).connect(audioCtx.destination);
 
   Object.entries(ambientTracks).forEach(([name, src]) => {
     const audio = new Audio(src);
@@ -248,6 +246,7 @@ const updateTrackCard = async (autoplay = false) => {
   ui.trackImage.src = withCoverFallback(track.image || state.selectedBook?.cover, state.selectedBook?.title || track.title);
   applyImageFallback(ui.trackImage, state.selectedBook?.title || track.title);
   ui.player.src = track.audio;
+  ui.player.load();
 
   if (autoplay) {
     try {
@@ -328,13 +327,9 @@ const selectBook = async (book) => {
   }
 
   try {
-    try {
-      ensureAudioGraph();
-      if (audioCtx?.state === "suspended") {
-        await audioCtx.resume();
-      }
-    } catch {
-      // Ignore resume issues and continue fetching.
+    ensureAudioGraph();
+    if (audioCtx?.state === "suspended") {
+      await audioCtx.resume().catch(() => {});
     }
 
     const moodResponse = await fetch("/api/moods", {
@@ -372,6 +367,10 @@ const setupMixerEvents = () => {
 
     toggle.addEventListener("change", async () => {
       ensureAudioGraph();
+      if (!audioCtx) {
+        return;
+      }
+
       await audioCtx.resume();
 
       if (!ambientNodes[sound]) {
@@ -512,9 +511,22 @@ ui.searchForm.addEventListener("submit", async (event) => {
 });
 
 ui.skipButton.addEventListener("click", nextTrack);
-ui.player.addEventListener("play", async () => {
-  ensureAudioGraph();
-  await audioCtx.resume();
+ui.player.addEventListener("play", () => {
+  if (!audioCtx || audioCtx.state !== "suspended") {
+    return;
+  }
+
+  audioCtx.resume().catch(() => {});
+});
+ui.player.addEventListener("error", () => {
+  const errorCode = ui.player.error?.code;
+  if (errorCode === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+    updateStatus("Track source is unsupported or blocked. Skipping to the next track.");
+    nextTrack();
+    return;
+  }
+
+  updateStatus("Could not play this track. Try skipping to another one.");
 });
 ui.player.addEventListener("ended", nextTrack);
 ui.offlineButton.addEventListener("click", cacheForOffline);
