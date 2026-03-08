@@ -345,22 +345,21 @@ await new Promise(resolve => setTimeout(resolve, 300));
       const response = await fetch(pixabayUrl, {
     method: 'GET',
     headers: {
-        // Essential: This "Human" header is the most common fix for 403s on Render
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Referer': 'https://pixabay.com/'
+        'Accept': 'application/json'
     }
 });
 
-// CRITICAL: Check if the response is actually OK before calling .json()
-if (!response.ok) {
-    const errorBody = await response.text().catch(() => "No body");
-    console.error(`Pixabay blocked the request. Status: ${response.status}, Body: ${errorBody}`);
-    // Return an empty array or throw a clean error so the app doesn't crash
-    return []; 
+// NEW: This prevents the "Unexpected token E" crash
+const contentType = response.headers.get("content-type");
+if (!response.ok || !contentType || !contentType.includes("application/json")) {
+    const textError = await response.text();
+    console.error("Pixabay rejected the request. Body starts with:", textError.substring(0, 20));
+    return []; // Return empty so the loop can try the next candidate
 }
 
 const data = await response.json();
+
 
 
 
