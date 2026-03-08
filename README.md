@@ -1,13 +1,13 @@
 # Aura Reader
 
-Mobile-first Progressive Web App that converts a book mood into a playable instrumental soundtrack with an ambient nature mixer.
+Mobile-first Progressive Web App that converts a book mood into a playable local aura soundtrack with an ambient nature mixer.
 
 ## Stack
 
 - Node.js + Express + TypeScript backend
 - Tailwind CSS mobile-first frontend
 - AI with `groq-sdk` (`llama-3.3-70b-versatile`)
-- Google Books API + Pixabay Audio API integration
+- Google Books API + local `public/audio/auras` library
 - Web Audio API mixer (Rain, Wind, Fire)
 - PWA with Workbox service worker caching
 
@@ -16,7 +16,6 @@ Mobile-first Progressive Web App that converts a book mood into a playable instr
 Copy `.env.example` to `.env` and set:
 
 - `GROQ_API_KEY`
-- `PIXABAY_API_KEY`
 - `GOOGLE_BOOKS_API_KEY`
 - `PORT` (optional)
 
@@ -40,7 +39,8 @@ Open `http://localhost:3000`.
 ## Notes
 
 - Book covers use Google Books first, then Open Library (by ISBN) as a backup.
-- Music playback is strict instrumental-only. If no lyric-free tracks are available for a mood, the app returns no tracks rather than relaxing the filter.
+- Music playback is selected from local files in `public/audio/auras`, mapped from the 3 generated mood tags.
+- Mood tags and `Do Not Play Again` exclusions are saved by `book.id` and reused when that same book is selected again.
 
 ## Render deployment
 

@@ -3,7 +3,9 @@ const state = {
   tags: [],
   tracks: [],
   trackIndex: 0,
-  selectedBook: null
+  selectedBook: null,
+  blockedTrackIdsByBookId: {},
+  moodTagsByBookId: {}
 };
 
 const ambientTracks = {
@@ -21,11 +23,9 @@ const ui = {
   coverTitle: document.getElementById("focus-title"),
   coverAuthors: document.getElementById("focus-authors"),
   coverTags: document.getElementById("focus-tags"),
-  trackImage: document.getElementById("track-image"),
-  trackTitle: document.getElementById("track-title"),
-  trackArtist: document.getElementById("track-artist"),
   player: document.getElementById("music-player"),
-  skipButton: document.getElementById("skip-btn"),
+  playPauseButton: document.getElementById("play-pause-btn"),
+  banTrackButton: document.getElementById("ban-track-btn"),
   offlineButton: document.getElementById("offline-btn")
 };
 
@@ -33,6 +33,8 @@ let audioCtx;
 const ambientNodes = {};
 
 const cachedSessionKey = "aura-reader-session";
+const blockedTracksKey = "aura-blocked-tracks-by-book-id";
+const moodHistoryKey = "aura-moods-by-book-id";
 const sessionCacheName = "aura-session-v1";
 const sessionCachePath = "/offline/session.json";
 
@@ -89,14 +91,39 @@ const applyImageFallback = (img, title) => {
   }
 };
 
+const getCurrentBookId = () => String(state.selectedBook?.id || "").trim();
+
+const getBlockedTrackIdsForCurrentBook = () => {
+  const bookId = getCurrentBookId();
+  if (!bookId) {
+    return new Set();
+  }
+
+  const blocked = state.blockedTrackIdsByBookId[bookId];
+  return new Set(Array.isArray(blocked) ? blocked : []);
+};
+
+const setBlockedTrackIdsForCurrentBook = (ids) => {
+  const bookId = getCurrentBookId();
+  if (!bookId) {
+    return;
+  }
+
+  state.blockedTrackIdsByBookId[bookId] = [...new Set(ids)];
+};
+
 const saveSession = async () => {
   const payload = {
     tags: state.tags,
     tracks: state.tracks,
-    selectedBook: state.selectedBook
+    selectedBook: state.selectedBook,
+    blockedTrackIdsByBookId: state.blockedTrackIdsByBookId,
+    moodTagsByBookId: state.moodTagsByBookId
   };
 
   localStorage.setItem(cachedSessionKey, JSON.stringify(payload));
+  localStorage.setItem(blockedTracksKey, JSON.stringify(state.blockedTrackIdsByBookId));
+  localStorage.setItem(moodHistoryKey, JSON.stringify(state.moodTagsByBookId));
 
   if ("caches" in window) {
     try {
@@ -129,6 +156,14 @@ const applySession = (session) => {
       ui.coverTags.textContent = session.tags.join(" • ");
     }
 
+    if (session.blockedTrackIdsByBookId && typeof session.blockedTrackIdsByBookId === "object") {
+      state.blockedTrackIdsByBookId = session.blockedTrackIdsByBookId;
+    }
+
+    if (session.moodTagsByBookId && typeof session.moodTagsByBookId === "object") {
+      state.moodTagsByBookId = session.moodTagsByBookId;
+    }
+
     if (Array.isArray(session.tracks) && session.tracks.length) {
       state.tracks = session.tracks;
       state.trackIndex = 0;
@@ -148,23 +183,38 @@ const loadSession = async () => {
       if (response) {
         const cachedSession = await response.json();
         applySession(cachedSession);
-        return;
       }
     } catch (error) {
       console.error("Could not load session from Cache API", error);
     }
   }
 
-  const value = localStorage.getItem(cachedSessionKey);
-  if (!value) {
-    return;
+  const sessionValue = localStorage.getItem(cachedSessionKey);
+  if (sessionValue) {
+    try {
+      const session = JSON.parse(sessionValue);
+      applySession(session);
+    } catch {
+      localStorage.removeItem(cachedSessionKey);
+    }
   }
 
   try {
-    const session = JSON.parse(value);
-    applySession(session);
+    const blocked = JSON.parse(localStorage.getItem(blockedTracksKey) || "{}");
+    if (blocked && typeof blocked === "object") {
+      state.blockedTrackIdsByBookId = blocked;
+    }
   } catch {
-    localStorage.removeItem(cachedSessionKey);
+    localStorage.removeItem(blockedTracksKey);
+  }
+
+  try {
+    const moods = JSON.parse(localStorage.getItem(moodHistoryKey) || "{}");
+    if (moods && typeof moods === "object") {
+      state.moodTagsByBookId = moods;
+    }
+  } catch {
+    localStorage.removeItem(moodHistoryKey);
   }
 };
 
@@ -234,26 +284,32 @@ const renderBookFocus = () => {
 const updateTrackCard = async (autoplay = false) => {
   const track = state.tracks[state.trackIndex];
   if (!track) {
-    ui.trackTitle.textContent = "No track loaded";
-    ui.trackArtist.textContent = "Search and select a book";
-    ui.trackImage.src = fallbackCoverUrl(state.selectedBook?.title || "Aura Reader");
+    ui.player.pause();
     ui.player.removeAttribute("src");
+    ui.player.load();
+    if (ui.playPauseButton) {
+      ui.playPauseButton.textContent = "Play";
+    }
     return;
   }
 
-  ui.trackTitle.textContent = track.title;
-  ui.trackArtist.textContent = track.artist;
-  ui.trackImage.src = withCoverFallback(track.image || state.selectedBook?.cover, state.selectedBook?.title || track.title);
-  applyImageFallback(ui.trackImage, state.selectedBook?.title || track.title);
   ui.player.src = track.audio;
   ui.player.load();
 
   if (autoplay) {
     try {
       await ui.player.play();
+      if (ui.playPauseButton) {
+        ui.playPauseButton.textContent = "Pause";
+      }
     } catch {
       updateStatus("Soundtrack ready. Tap play to start.");
+      if (ui.playPauseButton) {
+        ui.playPauseButton.textContent = "Play";
+      }
     }
+  } else if (ui.playPauseButton) {
+    ui.playPauseButton.textContent = "Play";
   }
 };
 
@@ -262,8 +318,44 @@ const nextTrack = async () => {
     return;
   }
 
-  state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
-  await updateTrackCard(true);
+  const blockedIds = getBlockedTrackIdsForCurrentBook();
+  const startingIndex = state.trackIndex;
+
+  do {
+    state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
+    const track = state.tracks[state.trackIndex];
+    if (track && !blockedIds.has(track.id)) {
+      await updateTrackCard(true);
+      return;
+    }
+  } while (state.trackIndex !== startingIndex);
+
+  updateStatus("All tracks for this book are marked Do Not Play Again.");
+};
+
+const banCurrentTrack = async () => {
+  const currentTrack = state.tracks[state.trackIndex];
+  if (!currentTrack) {
+    return;
+  }
+
+  const blockedIds = getBlockedTrackIdsForCurrentBook();
+  blockedIds.add(currentTrack.id);
+  setBlockedTrackIdsForCurrentBook([...blockedIds]);
+  await saveSession();
+
+  if (blockedIds.size >= state.tracks.length) {
+    updateStatus("All tracks are blocked for this book. Pick another book to continue.");
+    ui.player.pause();
+    ui.player.removeAttribute("src");
+    ui.player.load();
+    if (ui.playPauseButton) {
+      ui.playPauseButton.textContent = "Play";
+    }
+    return;
+  }
+
+  await nextTrack();
 };
 
 const cacheForOffline = async () => {
@@ -305,11 +397,12 @@ const loadTracksByTags = async (tags) => {
   }
 
   const data = await response.json();
-  state.tracks = data.tracks || [];
+  const blockedIds = getBlockedTrackIdsForCurrentBook();
+  state.tracks = (data.tracks || []).filter((track) => !blockedIds.has(track.id));
   state.trackIndex = 0;
 
   if (!state.tracks.length) {
-    throw new Error("No instrumental tracks found for this mood. Try another book.");
+    throw new Error("No playable local aura tracks found for this mood.");
   }
 
   await updateTrackCard(true);
@@ -332,21 +425,32 @@ const selectBook = async (book) => {
       await audioCtx.resume().catch(() => {});
     }
 
-    const moodResponse = await fetch("/api/moods", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description: book.description })
-    });
+    const cachedTags = Array.isArray(state.moodTagsByBookId[book.id])
+      ? state.moodTagsByBookId[book.id].slice(0, 3)
+      : [];
 
-    if (!moodResponse.ok) {
-      throw new Error("Mood generation failed");
+    if (cachedTags.length) {
+      state.tags = cachedTags;
+      ui.coverTags.textContent = state.tags.join(" • ");
+      updateStatus("Using saved moods for this book...");
+    } else {
+      const moodResponse = await fetch("/api/moods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: book.description })
+      });
+
+      if (!moodResponse.ok) {
+        throw new Error("Mood generation failed");
+      }
+
+      const moodData = await moodResponse.json();
+      state.tags = (moodData.tags || []).slice(0, 3);
+      state.moodTagsByBookId[book.id] = state.tags;
+      ui.coverTags.textContent = state.tags.join(" • ");
     }
 
-    const moodData = await moodResponse.json();
-    state.tags = moodData.tags || [];
-    ui.coverTags.textContent = state.tags.join(" • ");
-
-    updateStatus("Fetching instrumental tracks...");
+    updateStatus("Fetching local aura tracks...");
     await loadTracksByTags(state.tags);
 
     await saveSession();
@@ -510,25 +614,61 @@ ui.searchForm.addEventListener("submit", async (event) => {
   }
 });
 
-ui.skipButton.addEventListener("click", nextTrack);
 ui.player.addEventListener("play", () => {
+  if (ui.playPauseButton) {
+    ui.playPauseButton.textContent = "Pause";
+  }
+
   if (!audioCtx || audioCtx.state !== "suspended") {
     return;
   }
 
   audioCtx.resume().catch(() => {});
 });
+
+ui.player.addEventListener("pause", () => {
+  if (ui.playPauseButton) {
+    ui.playPauseButton.textContent = "Play";
+  }
+});
+
 ui.player.addEventListener("error", () => {
   const errorCode = ui.player.error?.code;
   if (errorCode === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-    updateStatus("Track source is unsupported or blocked. Skipping to the next track.");
+    updateStatus("Track source is unsupported or blocked. Trying another track.");
     nextTrack();
     return;
   }
 
-  updateStatus("Could not play this track. Try skipping to another one.");
+  updateStatus("Could not play this track. Trying another one.");
+  nextTrack();
 });
+
 ui.player.addEventListener("ended", nextTrack);
+
+ui.playPauseButton?.addEventListener("click", async () => {
+  if (!ui.player.src) {
+    if (!state.tracks.length) {
+      updateStatus("Select a book first to start playback.");
+      return;
+    }
+
+    await updateTrackCard(false);
+  }
+
+  if (ui.player.paused) {
+    try {
+      await ui.player.play();
+    } catch {
+      updateStatus("Tap play again to allow audio playback.");
+    }
+    return;
+  }
+
+  ui.player.pause();
+});
+
+ui.banTrackButton?.addEventListener("click", banCurrentTrack);
 ui.offlineButton.addEventListener("click", cacheForOffline);
 
 setupMixerEvents();

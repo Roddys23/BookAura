@@ -67,15 +67,11 @@
 
       <section class="mt-5 rounded-3xl bg-white p-4 shadow-lg">
         <p class="text-xs uppercase tracking-[0.25em] text-pine/80">Now Playing</p>
-        <div class="mt-2 flex items-center gap-3">
-          <img id="track-image" src="" alt="Track artwork" class="h-16 w-16 rounded-xl object-cover bg-sand" />
-          <div class="flex-1">
-            <p id="track-title" class="text-sm font-bold">No track loaded</p>
-            <p id="track-artist" class="text-xs text-pine/70">Search and select a book</p>
-          </div>
-          <button id="skip-btn" class="rounded-xl bg-ember px-3 py-2 text-xs font-bold text-white">Skip</button>
+        <div class="mt-3 flex items-center gap-2">
+          <button id="play-pause-btn" class="rounded-xl bg-pine px-4 py-2 text-sm font-bold text-white">Play</button>
+          <button id="ban-track-btn" class="rounded-xl bg-ember px-3 py-2 text-xs font-bold text-white">Do Not Play Again</button>
         </div>
-        <audio id="music-player" class="mt-3 w-full" controls crossorigin="anonymous"></audio>
+        <audio id="music-player" class="hidden" crossorigin="anonymous"></audio>
       </section>
 
       <section class="mt-5 rounded-3xl bg-white p-4 shadow-lg">

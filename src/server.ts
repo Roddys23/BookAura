@@ -1,6 +1,7 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express, { Request, Response } from "express";
+import { readdir } from "fs/promises";
 import path from "path";
 import Groq from "groq-sdk";
 
@@ -23,25 +24,14 @@ type BookResult = {
   cover: string;
 };
 
-type PixabayAudioVariant =
-  | string
-  | {
-      url?: string;
-    };
-
-type PixabayTrack = {
-  id: number | string;
-  tags?: string;
-  duration?: number;
-  downloads?: number;
-  pageURL?: string;
-  user?: string;
-  userImageURL?: string;
-  audio?: Record<string, PixabayAudioVariant | undefined>;
+type LocalAuraTrack = {
+  id: string;
+  audio: string;
+  folder: string;
+  title: string;
 };
 
 const groqApiKey = process.env.GROQ_API_KEY;
-const pixabayApiKey = process.env.PIXABAY_API_KEY;
 const googleBooksApiKey = process.env.GOOGLE_BOOKS_API_KEY;
 
 const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
@@ -54,14 +44,6 @@ const cleanCoverUrl = (url?: string): string => {
   return url.replace("http://", "https://").replace(/&zoom=\d+/i, "");
 };
 
-const cleanMediaUrl = (url?: string): string => {
-  if (!url) {
-    return "";
-  }
-
-  return url.replace(/^http:\/\//i, "https://");
-};
-
 const trimDescription = (description: string): string =>
   description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
@@ -72,38 +54,114 @@ const toTitleCase = (value: string): string =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
 
-const getPixabayAudioUrl = (track: PixabayTrack): string => {
-  const audio = track.audio;
-  if (!audio) {
-    return "";
+const auraRootDir = path.join(publicDir, "audio", "auras");
+
+let localAuraCatalogPromise: Promise<LocalAuraTrack[]> | null = null;
+
+const moodFolderRules: Array<{ keywords: string[]; folders: string[] }> = [
+  { keywords: ["dark", "horror", "fear", "sinister", "haunted", "dread"], folders: ["horror", "dark", "thriller"] },
+  { keywords: ["mysterious", "mystery", "noir", "suspense", "investigation", "tense"], folders: ["thriller", "dark", "historical"] },
+  { keywords: ["romantic", "romance", "love", "intimate", "tender"], folders: ["romance", "ethereal", "general"] },
+  { keywords: ["epic", "heroic", "battle", "quest", "adventure"], folders: ["adventure", "fantasy", "Sci-Fi"] },
+  { keywords: ["cinematic", "future", "space", "sci-fi", "cyber", "robot"], folders: ["Sci-Fi", "adventure", "general"] },
+  { keywords: ["emotional", "melancholy", "sad", "grief", "lonely", "reflective"], folders: ["ethereal", "organic", "general"] },
+  { keywords: ["ambient", "calm", "peaceful", "nature", "meditative"], folders: ["organic", "ethereal", "general"] },
+  { keywords: ["atmospheric", "dreamy", "night", "moody"], folders: ["ethereal", "general", "historical"] },
+  { keywords: ["historical", "period", "ancient", "medieval"], folders: ["historical", "general", "organic"] },
+  { keywords: ["fantasy", "magical", "myth", "enchanted"], folders: ["fantasy", "ethereal", "adventure"] }
+];
+
+const shuffle = <T>(items: T[]): T[] => {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
 
-  const variants = [audio.high, audio.medium, audio.low];
-  for (const variant of variants) {
-    if (typeof variant === "string") {
-      return cleanMediaUrl(variant);
-    }
-
-    if (variant?.url) {
-      return cleanMediaUrl(variant.url);
-    }
-  }
-
-  return "";
+  return copy;
 };
 
-const buildTrackTitle = (track: PixabayTrack): string => {
-  const tags = String(track.tags || "")
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-    .slice(0, 3);
+const toTrackTitleFromFileName = (fileName: string): string => {
+  const stem = path.parse(fileName).name;
+  const normalized = stem
+    .replace(/[()]/g, " ")
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  if (!tags.length) {
-    return `Instrumental Track ${track.id}`;
+  if (!normalized) {
+    return "Aura Instrumental";
   }
 
-  return toTitleCase(tags.join(" "));
+  return toTitleCase(normalized);
+};
+
+const getFoldersForTag = (tag: string): string[] => {
+  const normalized = tag.toLowerCase().trim();
+  const matched = moodFolderRules.filter((rule) => rule.keywords.some((keyword) => normalized.includes(keyword)));
+  if (!matched.length) {
+    return ["general"];
+  }
+
+  return [...new Set(matched.flatMap((rule) => rule.folders))];
+};
+
+const scanAuraTracks = async (): Promise<LocalAuraTrack[]> => {
+  let folderEntries;
+
+  try {
+    folderEntries = await readdir(auraRootDir, { withFileTypes: true });
+  } catch (error) {
+    console.error("Could not read aura directory", error);
+    return [];
+  }
+
+  const tracks: LocalAuraTrack[] = [];
+  for (const entry of folderEntries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const folderName = entry.name;
+    const folderPath = path.join(auraRootDir, folderName);
+
+    let files;
+    try {
+      files = await readdir(folderPath, { withFileTypes: true });
+    } catch (error) {
+      console.error(`Could not read aura folder: ${folderName}`, error);
+      continue;
+    }
+
+    for (const file of files) {
+      if (!file.isFile()) {
+        continue;
+      }
+
+      const lowerName = file.name.toLowerCase();
+      if (!lowerName.endsWith(".mp3") && !lowerName.endsWith(".wav") && !lowerName.endsWith(".m4a") && !lowerName.endsWith(".ogg")) {
+        continue;
+      }
+
+      const webPath = `/audio/auras/${encodeURIComponent(folderName)}/${encodeURIComponent(file.name)}`;
+      tracks.push({
+        id: `${folderName}/${file.name}`,
+        audio: webPath,
+        folder: folderName,
+        title: toTrackTitleFromFileName(file.name)
+      });
+    }
+  }
+
+  return tracks;
+};
+
+const getLocalAuraCatalog = async (): Promise<LocalAuraTrack[]> => {
+  if (!localAuraCatalogPromise) {
+    localAuraCatalogPromise = scanAuraTracks();
+  }
+
+  return localAuraCatalogPromise;
 };
 
 const deriveFallbackMoodTags = (description: string): string[] => {
@@ -312,76 +370,31 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
     return;
   }
 
-  if (!pixabayApiKey) {
-    res.status(503).json({ error: "Music provider is not configured. Set PIXABAY_API_KEY to enable soundtrack playback." });
-    return;
-  }
-
   try {
-    const queryCandidates = [
-      `${tags.join(" ")} instrumental`,
-      ...tags.map((tag) => `${tag} instrumental music`),
-      `${tags[0]} cinematic instrumental`
+    const allTracks = await getLocalAuraCatalog();
+    const folderCandidates = [
+      ...new Set(tags.flatMap((tag) => getFoldersForTag(tag)).concat(["general"]))
     ];
 
-    const uniqueCandidates = [...new Set(queryCandidates.map((query) => query.trim()).filter(Boolean))].slice(0, 5);
+    const candidateTracks = allTracks.filter((track) => folderCandidates.includes(track.folder));
+    const selectedTracks = shuffle(candidateTracks).slice(0, 10);
 
-    const allHits: PixabayTrack[] = [];
-
-    for (const queryText of uniqueCandidates) {
-      const query = new URLSearchParams({
-        key: pixabayApiKey,
-        q: queryText,
-        per_page: "30",
-        order: "popular",
-        category: "music",
-        safesearch: "true"
-      });
-
-      const pixabayUrl = `https://pixabay.com/api/audio/?${query.toString()}`;
-      const response = await fetch(pixabayUrl);
-
-      if (!response.ok) {
-        throw new Error(`Pixabay failed (${response.status})`);
-      }
-
-      const payload = (await response.json()) as { hits?: PixabayTrack[] };
-      allHits.push(...(payload.hits || []));
-
-      if (allHits.length >= 40) {
-        break;
-      }
-    }
-
-    const disallowedVocalHints = /\b(voice|vocals?|lyric|singer|singing|feat\.?|featuring|ft\.?|duet|choir)\b/i;
-
-    const dedupedHits = Array.from(new Map(allHits.map((track) => [String(track.id), track])).values());
-
-    const tracks = dedupedHits
-      .filter((track) => {
-        const metadataText = `${track.tags || ""} ${track.pageURL || ""}`.toLowerCase();
-        return !disallowedVocalHints.test(metadataText);
-      })
-      .map((track) => ({ track, audioUrl: getPixabayAudioUrl(track) }))
-      .filter(({ audioUrl }) => Boolean(audioUrl))
-      .sort((a, b) => Number(b.track.downloads || 0) - Number(a.track.downloads || 0))
-      .slice(0, 10)
-      .map(({ track, audioUrl }) => ({
-        id: String(track.id),
-        title: buildTrackTitle(track),
-        artist: track.user || "Pixabay Artist",
-        audio: audioUrl,
-        download: audioUrl,
-        image: cleanCoverUrl(track.userImageURL),
-        duration: Number(track.duration || 0)
-      }));
+    const tracks = selectedTracks.map((track) => ({
+      id: track.id,
+      title: track.title,
+      artist: `${track.folder} aura`,
+      audio: track.audio,
+      download: track.audio,
+      image: "",
+      duration: 0
+    }));
 
     if (!tracks.length) {
-      res.status(404).json({ error: "No strictly instrumental (lyric-free) tracks found for this mood. Try another book." });
+      res.status(404).json({ error: "No local aura tracks found for this mood. Add files under public/audio/auras." });
       return;
     }
 
-    res.json({ tracks, source: "pixabay" });
+    res.json({ tracks, source: "local" });
   } catch (error) {
     console.error("/api/tracks error", error);
     res.status(500).json({ error: "Failed to fetch music tracks." });
