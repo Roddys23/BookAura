@@ -1,7 +1,7 @@
 /* global workbox */
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js");
 
-const APP_VERSION = "1773010474589";
+const APP_VERSION = "1773010657468";
 const CACHE_PREFIXES = ["aura-pages-", "aura-audio-", "aura-images-", "aura-api-", "aura-flight-mode-"];
 const ACTIVE_CACHES = new Set([
   `aura-pages-${APP_VERSION}`,
