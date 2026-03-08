@@ -339,6 +339,9 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
       });
 
       const pixabayUrl = `https://pixabay.com/api/audio/?${query.toString()}`;
+// Add this right before line 342
+await new Promise(resolve => setTimeout(resolve, 300)); 
+
       const response = await fetch(pixabayUrl, {
     method: 'GET',
     headers: {
