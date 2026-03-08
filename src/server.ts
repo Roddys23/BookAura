@@ -339,11 +339,21 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
       });
 
       const pixabayUrl = `https://pixabay.com/api/audio/?${query.toString()}`;
-      const response = await fetch(pixabayUrl);
+      const response = await fetch(pixabayUrl, {
+    method: 'GET',
+    headers: {
+        // This 'User-Agent' makes Render look like a real browser to Pixabay
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+    }
+});
 
-      if (!response.ok) {
-        throw new Error(`Pixabay failed (${response.status})`);
-      }
+if (!response.ok) {
+    // This will help us see if it's still 403 or something else
+    const errorBody = await response.text().catch(() => "No body");
+    throw new Error(`Pixabay failed (${response.status}): ${errorBody}`);
+}
+
 
       const payload = (await response.json()) as { hits?: PixabayTrack[] };
       allHits.push(...(payload.hits || []));
