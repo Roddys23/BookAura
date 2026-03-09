@@ -407,9 +407,20 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
 
   try {
     const allTracks = await getLocalAuraCatalog();
-    const folderCandidates = [
-      ...new Set(tags.flatMap((tag) => getFoldersForTag(tag)).concat(["general"]))
-    ];
+            // 1. Determine the best folder based on keywords
+        const matchedAura = determineAura(
+            String(req.query.title || ""), 
+            String(req.query.description || ""), 
+            tags
+        );
+
+        // 2. Set candidates with the matched aura as the top priority
+        const folderCandidates = [
+            matchedAura,
+            ...new Set(tags.flatMap((tag) => getFoldersForTag(tag))),
+            "general"
+        ];
+
 
     const selectedTracks = shuffle(
       allTracks.filter((track) => folderCandidates.includes(track.folder))
