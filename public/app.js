@@ -326,9 +326,15 @@ const updateTrackCard = async (autoplay = false) => {
 };
 
 const nextTrack = async () => {
-  if (!state.tracks.length) {
-    return;
-  }
+    if (!state.tracks.length) return;
+
+    const blockedIds = getBlockedTrackIdsForCurrentBook();
+    const startingIndex = state.trackIndex;
+
+    do {
+        state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
+        // ... the rest of your history logic continues here
+
 
       do {
         state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
