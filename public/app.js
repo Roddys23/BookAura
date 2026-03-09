@@ -1,3 +1,5 @@
+const recentTrackIds = []; 
+
 const state = {
   books: [],
   tags: [],
@@ -328,17 +330,24 @@ const nextTrack = async () => {
     return;
   }
 
-  const blockedIds = getBlockedTrackIdsForCurrentBook();
-  const startingIndex = state.trackIndex;
+      do {
+        state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
+        const track = state.tracks[state.trackIndex];
 
-  do {
-    state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
-    const track = state.tracks[state.trackIndex];
-    if (track && !blockedIds.has(track.id)) {
-      await updateTrackCard(true);
-      return;
-    }
-  } while (state.trackIndex !== startingIndex);
+        // Check if track is blocked OR played in the last 3 turns
+        const isBlocked = blockedIds.has(track?.id);
+        const isRecent = recentTrackIds.includes(track?.id);
+
+        if (track && !isBlocked && !isRecent) {
+            // Success! Add to history
+            recentTrackIds.push(track.id);
+            if (recentTrackIds.length > 3) recentTrackIds.shift();
+
+            await updateTrackCard(true);
+            return;
+        }
+    } while (state.trackIndex !== startingIndex);
+
 
   updateStatus("All tracks for this book are marked Do Not Play Again.");
 };
