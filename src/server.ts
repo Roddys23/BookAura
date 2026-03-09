@@ -359,6 +359,38 @@ app.post("/api/moods", async (req: Request, res: Response) => {
   }
 });
 
+// --- PASTE AT LINE 361 ---
+const AURA_KEYWORDS: Record<string, string[]> = {
+    dark_fantasy: ["blood", "blade", "demon", "crown", "curse", "throne", "gothic", "sacrifice", "magic"],
+    ethereal: ["dream", "spirit", "light", "cloud", "floating", "glow", "soft", "aura", "vision", "angelic"],
+    fantasy: ["dragon", "elf", "wizard", "quest", "myth", "ancient", "prophecy", "castle", "hidden"],
+    horror: ["scream", "nightmare", "monster", "death", "teeth", "bone", "killer", "haunt", "terrifying"],
+    romance: ["heart", "love", "kiss", "passion", "wedding", "desire", "sweet", "crush", "darling"],
+    suspense: ["ticking", "secret", "chase", "lies", "truth", "evidence", "danger", "trap", "alert"],
+    minimal: ["quiet", "white", "empty", "simple", "still", "breath", "clear", "lone", "essence"],
+    organic: ["forest", "tree", "earth", "dirt", "green", "garden", "wild", "roots", "moss", "rain"],
+    celestial: ["space", "star", "planet", "galaxy", "orbit", "metal", "neon", "ship", "vacuum", "future"],
+    vintage: ["memory", "history", "past", "old", "letter", "dusty", "classic", "archive", "antique"],
+    noir: ["rain", "smoke", "detective", "crime", "shadow", "alley", "midnight", "cold", "city", "jazz"],
+    adventure: ["journey", "travel", "map", "compass", "gold", "mountain", "explore", "hero", "escape"]
+};
+
+function determineAura(title: string, description: string, tags: string[]): string {
+    const fullText = `${title} ${description} ${tags.join(' ')}`.toLowerCase();
+    let bestAura = "minimal";
+    let highestScore = 0;
+
+    for (const [aura, keywords] of Object.entries(AURA_KEYWORDS)) {
+        let score = keywords.filter(word => fullText.includes(word)).length;
+        if (score > highestScore) {
+            highestScore = score;
+            bestAura = aura;
+        }
+    }
+    return bestAura;
+}
+// --- END OF NEW CODE ---
+
 app.get("/api/tracks", async (req: Request, res: Response) => {
   const tagsRaw = String(req.query.tags || "").trim();
 
