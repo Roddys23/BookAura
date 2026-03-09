@@ -324,7 +324,7 @@ app.post("/api/moods", async (req: Request, res: Response) => {
         {
           role: "system",
           content:
-            "You return exactly 3 concise, specific musical mood tags for a book description. Output strict JSON as {\"tags\":[\"tag one\",\"tag two\",\"tag three\"]}."
+            "You return exactly 6 concise, specific musical mood tags for a book description. Output strict JSON as {\"tags\":[\"tag one\",\"tag two\",\"tag three\"]}."
         },
         {
           role: "user",
@@ -398,7 +398,7 @@ app.get("/api/tracks", async (req: Request, res: Response) => {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, 6);
 
   if (!tags.length) {
     res.status(400).json({ error: "Missing query parameter 'tags'." });
