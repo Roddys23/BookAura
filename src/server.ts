@@ -236,10 +236,11 @@ app.get("/api/books", async (req: Request, res: Response) => {
   }
 
   try {
-    const params = new URLSearchParams({
+   const params = new URLSearchParams({
       q: query,
-      maxResults: "8",
-      printType: "books"
+      maxResults: "5",
+      printType: "books",
+      orderBy: "relevance"
     });
 
     if (googleBooksApiKey) {
