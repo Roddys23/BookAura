@@ -333,16 +333,11 @@ const nextTrack = async () => {
 
     do {
         state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
-        // ... the rest of your history logic continues here
-
-
-      do {
-        state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
         const track = state.tracks[state.trackIndex];
 
         // Check if track is blocked OR played in the last 3 turns
-        const isBlocked = blockedIds.has(track?.id);
-        const isRecent = recentTrackIds.includes(track?.id);
+        const isBlocked = track ? blockedIds.has(track.id) : false;
+        const isRecent = track ? recentTrackIds.includes(track.id) : false;
 
         if (track && !isBlocked && !isRecent) {
             // Success! Add to history
@@ -352,6 +347,13 @@ const nextTrack = async () => {
             await updateTrackCard(true);
             return;
         }
+    } while (state.trackIndex !== startingIndex);
+
+    // Final Fallback: if folder is tiny, just play the next one
+    state.trackIndex = (startingIndex + 1) % state.tracks.length;
+    await updateTrackCard(true);
+};
+
     } while (state.trackIndex !== startingIndex);
 
 
