@@ -236,12 +236,14 @@ app.get("/api/books", async (req: Request, res: Response) => {
   }
 
   try {
-   const params = new URLSearchParams({
-      q: query,
-      maxResults: "5",
-      printType: "books",
-      orderBy: "relevance"
-    });
+const titleQuery = `intitle:${query}`;
+
+const params = new URLSearchParams({
+  q: titleQuery,
+  maxResults: "5",
+  printType: "books",
+  orderBy: "relevance"
+});
 
     if (googleBooksApiKey) {
       params.set("key", googleBooksApiKey);
