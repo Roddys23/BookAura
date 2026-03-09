@@ -1,4 +1,4 @@
-const recentTrackIds = []; 
+let recentTrackIds = [];
 
 const state = {
   books: [],
@@ -326,38 +326,47 @@ const updateTrackCard = async (autoplay = false) => {
 };
 
 const nextTrack = async () => {
-    if (!state.tracks.length) return;
+  if (!state.tracks.length) {
+    return;
+  }
 
-    const blockedIds = getBlockedTrackIdsForCurrentBook();
-    const startingIndex = state.trackIndex;
+  const blockedIds = getBlockedTrackIdsForCurrentBook();
+  const startingIndex = state.trackIndex;
+  let fallbackIndex = (startingIndex + 1) % state.tracks.length;
 
-    do {
-        state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
-        const track = state.tracks[state.trackIndex];
+  do {
+    state.trackIndex = (state.trackIndex + 1) % state.tracks.length;
+    const track = state.tracks[state.trackIndex];
 
-        // Check if track is blocked OR played in the last 3 turns
-        const isBlocked = track ? blockedIds.has(track.id) : false;
-        const isRecent = track ? recentTrackIds.includes(track.id) : false;
+    if (!track) {
+      continue;
+    }
 
-        if (track && !isBlocked && !isRecent) {
-            // Success! Add to history
-            recentTrackIds.push(track.id);
-            if (recentTrackIds.length > 3) recentTrackIds.shift();
+    if (state.trackIndex === fallbackIndex) {
+      fallbackIndex = state.trackIndex;
+    }
 
-            await updateTrackCard(true);
-            return;
-        }
-    } while (state.trackIndex !== startingIndex);
+    if (!blockedIds.has(track.id) && !recentTrackIds.includes(track.id)) {
+      recentTrackIds.push(track.id);
+      if (recentTrackIds.length > 3) {
+        recentTrackIds.shift();
+      }
 
-    // Final Fallback: if folder is tiny or all blocked, play next available
-    state.trackIndex = (startingIndex + 1) % state.tracks.length;
-    await updateTrackCard(true);
-};
+      await updateTrackCard(true);
+      return;
+    }
+  } while (state.trackIndex !== startingIndex);
 
-    } while (state.trackIndex !== startingIndex);
+  state.trackIndex = fallbackIndex;
+  const fallbackTrack = state.tracks[state.trackIndex];
+  if (fallbackTrack?.id) {
+    recentTrackIds.push(fallbackTrack.id);
+    if (recentTrackIds.length > 3) {
+      recentTrackIds.shift();
+    }
+  }
 
-
-  updateStatus("All tracks for this book are marked Do Not Play Again.");
+  await updateTrackCard(true);
 };
 
 const banCurrentTrack = async () => {
@@ -621,8 +630,8 @@ const registerServiceWorker = async () => {
   }
 };
 
-ui.searchForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
+const handleSearch = async (e) => {
+  e.preventDefault();
   const query = ui.queryInput.value.trim();
   if (!query) {
     return;
@@ -639,7 +648,9 @@ ui.searchForm.addEventListener("submit", async (event) => {
 
     updateStatus(error?.message || "Book search failed.");
   }
-});
+};
+
+ui.searchForm.addEventListener("submit", handleSearch);
 
 ui.player.addEventListener("play", () => {
   if (ui.playPauseButton) {
