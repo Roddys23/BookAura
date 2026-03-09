@@ -308,6 +308,28 @@ const updateTrackCard = async (autoplay = false) => {
   ui.player.src = track.audio;
   ui.player.load();
 
+  // --- INSERT BACKGROUND PLAY LOGIC HERE ---
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || 'Aura Track',
+      artist: 'Aura Reader',
+      album: state.currentBook?.title || 'Ambient Library',
+      artwork: [
+        { src: state.currentBook?.thumbnail || '', sizes: '512x512', type: 'image/png' }
+      ]
+    });
+
+    // Enables the "Next" button on your lock screen
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      nextTrack();
+    });
+
+    // Enables the "Pause/Play" buttons on your lock screen
+    navigator.mediaSession.setActionHandler('play', () => ui.player.play());
+    navigator.mediaSession.setActionHandler('pause', () => ui.player.pause());
+  }
+  // ------------------------------------------
+
   if (autoplay) {
     try {
       await ui.player.play();
@@ -712,3 +734,5 @@ ui.offlineButton.addEventListener("click", cacheForOffline);
 setupMixerEvents();
 loadSession();
 registerServiceWorker();
+
+ui.player.addEventListener('ended', () => nextTrack());
