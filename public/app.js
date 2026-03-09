@@ -349,7 +349,7 @@ const nextTrack = async () => {
         }
     } while (state.trackIndex !== startingIndex);
 
-    // Final Fallback: if folder is tiny, just play the next one
+    // Final Fallback: if folder is tiny or all blocked, play next available
     state.trackIndex = (startingIndex + 1) % state.tracks.length;
     await updateTrackCard(true);
 };
