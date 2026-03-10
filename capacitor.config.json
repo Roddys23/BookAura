@@ -1,0 +1,11 @@
+{
+  "appId": "com.roddy.BookAura",
+  "appName": "BookAura",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "https://bookaura-dkm4.onrender.com" 
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+body {
+  background-image: radial-gradient(circle at 20% 20%, rgba(15, 61, 46, 0.14), transparent 45%),
+    radial-gradient(circle at 78% 12%, rgba(217, 72, 40, 0.1), transparent 40%),
+    linear-gradient(180deg, #f4ecde 0%, #efe1cc 100%);
+}
+
+#book-results button {
+  animation: rise 320ms ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ambient-row {
+  border: 1px solid rgba(15, 61, 46, 0.1);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+@media (min-width: 768px) {
+  main {
+    max-width: 540px;
+  }
+}

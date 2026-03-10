@@ -1,0 +1,8 @@
+# Protect my API Keys
+.env
+
+# Ignore giant folders we don't need on GitHub
+node_modules/
+dist/
+build/
+.DS_Store

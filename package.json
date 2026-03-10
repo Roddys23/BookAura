@@ -1,0 +1,39 @@
+{
+  "name": "bookaura",
+  "version": "1.0.0",
+  "description": "Aura Reader mobile PWA",
+  "main": "dist/server.js",
+  "scripts": {
+    "prebuild": "node scripts/bump-sw-version.js",
+    "build": "tsc",
+    "prestart": "node scripts/bump-sw-version.js",
+    "start": "node dist/server.js",
+    "predev": "node scripts/bump-sw-version.js",
+    "dev": "npm run build && npm start",
+    "dev:watch": "tsc --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Roddys23/BookAura.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Roddys23/BookAura/issues"
+  },
+  "homepage": "https://github.com/Roddys23/BookAura#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "groq-sdk": "^0.37.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.3.5",
+    "typescript": "^5.9.3"
+  }
+}

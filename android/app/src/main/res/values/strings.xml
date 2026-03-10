@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BookAura</string>
+    <string name="title_activity_main">BookAura</string>
+    <string name="package_name">com.bookaura.app</string>
+    <string name="custom_url_scheme">com.bookaura.app</string>
+</resources>

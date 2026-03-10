@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Aura Reader icon">
+  <rect width="512" height="512" rx="112" fill="#0f3d2e" />
+  <circle cx="256" cy="256" r="154" fill="#f2e7d5" opacity="0.9" />
+  <path d="M167 335V177h48c52 0 80 23 80 61 0 45-34 70-83 70h-18v27h-27zm27-50h20c34 0 53-13 53-40 0-25-16-37-49-37h-24v77zm125 50V177h26v158h-26z" fill="#0f3d2e" />
+</svg>

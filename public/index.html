@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f3d2e" />
+    <title>Aura Reader</title>
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              display: ["Bebas Neue", "sans-serif"],
+              body: ["Manrope", "sans-serif"]
+            },
+            colors: {
+              pine: "#0f3d2e",
+              moss: "#3f7c61",
+              sand: "#f2e7d5",
+              ember: "#d94828"
+            }
+          }
+        }
+      };
+    </script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;600;700&display=swap" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="bg-sand min-h-screen text-pine font-body">
+    <main class="mx-auto max-w-md min-h-screen px-4 pb-8 pt-6">
+      
+
+      <section class="rounded-3xl bg-white/80 p-4 shadow-lg backdrop-blur-md">
+        <form id="book-search-form" class="flex gap-2">
+          <input
+            id="book-query"
+            type="search"
+            placeholder="Search a book title..."
+            class="w-full rounded-2xl border border-pine/20 bg-white px-4 py-3 text-sm outline-none ring-0 focus:border-moss"
+            required
+          />
+          <button class="rounded-2xl bg-pine px-4 py-3 text-sm font-bold text-white">Find</button>
+        </form>
+        <p id="status" class="mt-2 text-xs text-pine/70">Search for a book to begin.</p>
+      </section>
+
+      <section id="book-results" class="mt-4 grid gap-3"></section>
+
+      <section id="focus-cover" class="mt-5 rounded-3xl bg-gradient-to-br from-pine to-moss p-4 text-white shadow-lg">
+        <p class="text-xs uppercase tracking-[0.3em]">Current Book</p>
+        <div class="mt-3 flex gap-3">
+          <img id="focus-cover-image" src="" alt="Selected book cover" class="h-36 w-24 rounded-xl object-cover bg-white/20" />
+          <div>
+            <h2 id="focus-title" class="text-xl font-semibold leading-tight">Pick a book</h2>
+            <p id="focus-authors" class="mt-1 text-sm text-white/90"></p>
+            <p id="focus-tags" class="mt-3 text-xs uppercase tracking-[0.2em]"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-5 rounded-3xl bg-white p-4 shadow-lg">
+        <p class="text-xs uppercase tracking-[0.25em] text-pine/80">Now Playing</p>
+        <div class="mt-3 flex items-center gap-2">
+          <button id="play-pause-btn" class="rounded-xl bg-pine px-4 py-2 text-sm font-bold text-white">Play</button>
+          <button id="ban-track-btn" class="rounded-xl bg-ember px-3 py-2 text-xs font-bold text-white">Do Not Play Again</button>
+        </div>
+        <audio id="music-player" class="hidden" crossorigin="anonymous"></audio>
+      </section>
+
+      <section class="mt-5 rounded-3xl bg-white p-4 shadow-lg">
+        <div class="flex items-center justify-between">
+          <p class="text-xs uppercase tracking-[0.25em] text-pine/80">Ambient Mixer</p>
+          <button id="offline-btn" class="rounded-xl bg-pine px-3 py-2 text-xs font-bold text-white">Download for Offline</button>
+        </div>
+
+        <div class="mt-3 space-y-4">
+          <div class="ambient-row" data-sound="rain">
+            <label class="flex items-center justify-between text-sm font-semibold">
+              <span>Rain</span>
+              <input type="checkbox" class="ambient-toggle h-5 w-5 accent-moss" />
+            </label>
+            <input type="range" min="0" max="1" step="0.01" value="0.35" class="ambient-volume mt-2 w-full" />
+          </div>
+
+          <div class="ambient-row" data-sound="wind">
+            <label class="flex items-center justify-between text-sm font-semibold">
+              <span>Wind</span>
+              <input type="checkbox" class="ambient-toggle h-5 w-5 accent-moss" />
+            </label>
+            <input type="range" min="0" max="1" step="0.01" value="0.25" class="ambient-volume mt-2 w-full" />
+          </div>
+
+          <div class="ambient-row" data-sound="fire">
+            <label class="flex items-center justify-between text-sm font-semibold">
+              <span>Fire</span>
+              <input type="checkbox" class="ambient-toggle h-5 w-5 accent-moss" />
+            </label>
+            <input type="range" min="0" max="1" step="0.01" value="0.2" class="ambient-volume mt-2 w-full" />
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
